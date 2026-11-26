@@ -2,6 +2,574 @@
 openapi: 3.1.0
 info:
   title: store-app
-  version: architecture-v0
+  version: architecture-v1
   description: Designed API from the approved architecture (not extracted from code).
-paths: {}
+paths:
+  /admin/config:
+    get:
+      summary: Read store configuration (country, currency, tax rate, shipping flat
+        rate and threshold).
+      description: Read store configuration (country, currency, tax rate, shipping
+        flat rate and threshold).
+      operationId: get_admin_config
+      parameters: []
+      responses:
+        '200':
+          description: store_config
+      security:
+      - bearerAuth: []
+    put:
+      summary: Update country, currency, tax rate, flat shipping and free-shipping
+        threshold.
+      description: Update country, currency, tax rate, flat shipping and free-shipping
+        threshold.
+      operationId: put_admin_config
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: '{country, currency, tax_rate, flat_shipping_amount, free_shipping_threshold}'
+      responses:
+        '200':
+          description: store_config
+      security:
+      - bearerAuth: []
+  /admin/login:
+    post:
+      summary: Admin sign-in; returns an opaque session token in the body on success,
+        generic error otherwise.
+      description: Admin sign-in; returns an opaque session token in the body on success,
+        generic error otherwise.
+      operationId: post_admin_login
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: '{username, password}'
+      responses:
+        '200':
+          description: '{token, expires_at}'
+  /admin/logout:
+    post:
+      summary: Revoke the current admin session token server-side.
+      description: Revoke the current admin session token server-side.
+      operationId: post_admin_logout
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: none
+      responses:
+        '200':
+          description: '204'
+      security:
+      - bearerAuth: []
+  /admin/orders:
+    get:
+      summary: List placed orders with reference, email, total, date and current stage.
+      description: List placed orders with reference, email, total, date and current
+        stage.
+      operationId: get_admin_orders
+      parameters: []
+      responses:
+        '200':
+          description: array of order summaries
+      security:
+      - bearerAuth: []
+  /admin/orders/{id}:
+    get:
+      summary: Order detail with items, variants, quantities, totals, shipping address
+        and stage.
+      description: Order detail with items, variants, quantities, totals, shipping
+        address and stage.
+      operationId: get_admin_orders_id
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: order detail
+      security:
+      - bearerAuth: []
+  /admin/orders/{id}/stage:
+    patch:
+      summary: Advance an order to a later fulfilment stage, recorded manually within
+        the app.
+      description: Advance an order to a later fulfilment stage, recorded manually
+        within the app.
+      operationId: patch_admin_orders_id_stage
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: '{fulfilment_stage}'
+      responses:
+        '200':
+          description: updated order
+      security:
+      - bearerAuth: []
+  /admin/products:
+    get:
+      summary: List products for admin management.
+      description: List products for admin management.
+      operationId: get_admin_products
+      parameters: []
+      responses:
+        '200':
+          description: array of products
+      security:
+      - bearerAuth: []
+    post:
+      summary: Create a product with name, category, description and price; validation
+        errors returned for missing name or invalid pric
+      description: Create a product with name, category, description and price; validation
+        errors returned for missing name or invalid price.
+      operationId: post_admin_products
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: '{name, category_id, description, price}'
+      responses:
+        '200':
+          description: created product
+      security:
+      - bearerAuth: []
+  /admin/products/{id}:
+    put:
+      summary: Edit a product's name, category, description or price.
+      description: Edit a product's name, category, description or price.
+      operationId: put_admin_products_id
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: '{name, category_id, description, price}'
+      responses:
+        '200':
+          description: updated product
+      security:
+      - bearerAuth: []
+  /admin/products/{id}/images:
+    post:
+      summary: Upload one or more product images to S3 media storage.
+      description: Upload one or more product images to S3 media storage.
+      operationId: post_admin_products_id_images
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: multipart file(s)
+      responses:
+        '200':
+          description: array of {id, url}
+      security:
+      - bearerAuth: []
+  /admin/products/{id}/images/{image_id}:
+    delete:
+      summary: Delete a product image from storage and the product.
+      description: Delete a product image from storage and the product.
+      operationId: delete_admin_products_id_images_image_id
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: image_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: '204'
+      security:
+      - bearerAuth: []
+  /admin/products/{id}/variants:
+    post:
+      summary: Add or update size/colour variants and per-variant stock.
+      description: Add or update size/colour variants and per-variant stock.
+      operationId: post_admin_products_id_variants
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: '{size, colour, stock_quantity}'
+      responses:
+        '200':
+          description: variant
+      security:
+      - bearerAuth: []
+  /categories:
+    get:
+      summary: List categories for the storefront.
+      description: List categories for the storefront.
+      operationId: get_categories
+      parameters: []
+      responses:
+        '200':
+          description: array of {id, name, slug}
+  /categories/{slug}/products:
+    get:
+      summary: List available products in a category with thumbnail, name and price;
+        empty-category message handled by empty array.
+      description: List available products in a category with thumbnail, name and
+        price; empty-category message handled by empty array.
+      operationId: get_categories_slug_products
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: array of {id, name, price, thumbnail_url}
+  /checkout:
+    post:
+      summary: Validate stock and in-country address, take card payment via Stripe,
+        create the order and send the confirmation email.
+      description: Validate stock and in-country address, take card payment via Stripe,
+        create the order and send the confirmation email.
+      operationId: post_checkout
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: '{email, shipping_address, items[], payment_method_id}'
+      responses:
+        '200':
+          description: '{order_reference, grand_total, currency} or payment/stock
+            error'
+  /checkout/quote:
+    post:
+      summary: 'Price a cart: subtotal, flat-rate or free shipping, tax and grand
+        total in store currency.'
+      description: 'Price a cart: subtotal, flat-rate or free shipping, tax and grand
+        total in store currency.'
+      operationId: post_checkout_quote
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: '{items:[{variant_id, quantity}]}'
+      responses:
+        '200':
+          description: '{subtotal, shipping_amount, tax_amount, grand_total, currency,
+            issues[]}'
+  /orders/track:
+    post:
+      summary: Return order items and current fulfilment stage only when reference
+        and email both match; generic not-found otherwise.
+      description: Return order items and current fulfilment stage only when reference
+        and email both match; generic not-found otherwise.
+      operationId: post_orders_track
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: '{order_reference, email}'
+      responses:
+        '200':
+          description: '{order_reference, fulfilment_stage, items[]} or generic no-match
+            message'
+  /products/{id}:
+    get:
+      summary: Product detail with images, description, price and variants including
+        per-variant stock availability.
+      description: Product detail with images, description, price and variants including
+        per-variant stock availability.
+      operationId: get_products_id
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: '{id, name, description, price, images[], variants[{id, size,
+            colour, in_stock}]}'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    category:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+      required:
+      - id
+      - name
+      - slug
+    product:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        category_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - category_id
+      - name
+      - price
+      - created_at
+      - updated_at
+    product_variant:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        product_id:
+          type: string
+          format: uuid
+        size:
+          type: string
+        colour:
+          type: string
+        stock_quantity:
+          type: integer
+      required:
+      - id
+      - product_id
+      - size
+      - colour
+      - stock_quantity
+    product_image:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        product_id:
+          type: string
+          format: uuid
+        s3_key:
+          type: string
+        url:
+          type: string
+        position:
+          type: integer
+      required:
+      - id
+      - product_id
+      - s3_key
+      - url
+      - position
+    customer_order:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        order_reference:
+          type: string
+        email:
+          type: string
+        shipping_name:
+          type: string
+        shipping_line1:
+          type: string
+        shipping_line2:
+          type: string
+        shipping_city:
+          type: string
+        shipping_postcode:
+          type: string
+        shipping_country:
+          type: string
+        subtotal:
+          type: number
+        shipping_amount:
+          type: number
+        tax_amount:
+          type: number
+        grand_total:
+          type: number
+        currency:
+          type: string
+        fulfilment_stage:
+          type: string
+        stripe_payment_intent_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - order_reference
+      - email
+      - shipping_name
+      - shipping_line1
+      - shipping_city
+      - shipping_postcode
+      - shipping_country
+      - subtotal
+      - shipping_amount
+      - tax_amount
+      - grand_total
+      - currency
+      - fulfilment_stage
+      - created_at
+    order_item:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        order_id:
+          type: string
+          format: uuid
+        variant_id:
+          type: string
+          format: uuid
+        product_name:
+          type: string
+        size:
+          type: string
+        colour:
+          type: string
+        unit_price:
+          type: number
+        quantity:
+          type: integer
+        line_total:
+          type: number
+      required:
+      - id
+      - order_id
+      - product_name
+      - size
+      - colour
+      - unit_price
+      - quantity
+      - line_total
+    admin_user:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        password_hash:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - username
+      - password_hash
+      - created_at
+    admin_session:
+      type: object
+      properties:
+        token:
+          type: string
+        admin_user_id:
+          type: string
+          format: uuid
+        expires_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - token
+      - admin_user_id
+      - expires_at
+      - created_at
+    store_config:
+      type: object
+      properties:
+        id:
+          type: integer
+        country:
+          type: string
+        currency:
+          type: string
+        tax_rate:
+          type: number
+        flat_shipping_amount:
+          type: number
+        free_shipping_threshold:
+          type: number
+        pending_confirmation:
+          type: boolean
+      required:
+      - id
+      - flat_shipping_amount
+      - free_shipping_threshold
+      - pending_confirmation
