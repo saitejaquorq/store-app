@@ -9,10 +9,12 @@ Pushes to `main` run `.github/workflows/deploy.yml`, which builds the API image 
 <!-- sdlc:auto:start environments -->
 | Name | Service | Runtime | Scaling | Environment |
 |---|---|---|---|---|
-| Store SPA | React static site on S3 + CloudFront | Static assets (React 19 build) | CDN edge cache | dev |
-| Store API | FastAPI on AWS App Runner | Python 3.12 container (FastAPI 0.115, Uvicorn) | 1 instance, auto-scale on request volume | dev |
-| PostgreSQL | Amazon RDS for PostgreSQL 16 | PostgreSQL 16 | Single db.t-class instance, encrypted at rest | dev |
-| Media Bucket | Amazon S3 | Object storage | Managed | dev |
+| Web SPA Host | React 19 static build (S3 + CloudFront) | Static site | CDN edge cache | dev |
+| Store API | FastAPI 0.115 on AWS ECS Fargate (uvicorn) | Python 3.12 | 1 task in dev, horizontal later | dev |
+| PostgreSQL | AWS RDS for PostgreSQL 16 | PostgreSQL 16 | Single instance, encryption at rest enabled | dev |
+| Media Storage | AWS S3 bucket | S3 | Managed | dev |
+| Stripe | Stripe payments API | SaaS | Managed | dev |
+| SendGrid | SendGrid email API | SaaS | Managed | dev |
 <!-- sdlc:auto:end environments -->
 
 <!-- sdlc:auto:start live -->
@@ -22,13 +24,17 @@ _Not deployed yet._
 <!-- sdlc:auto:start topology -->
 ```mermaid
 graph LR
-  n_Store_SPA["Store SPA<br/>React static site on S3 + CloudFront"]
-  n_Store_API["Store API<br/>FastAPI on AWS App Runner"]
-  n_PostgreSQL["PostgreSQL<br/>Amazon RDS for PostgreSQL 16"]
-  n_Media_Bucket["Media Bucket<br/>Amazon S3"]
-  n_Store_SPA -->|"HTTPS"| n_Store_API
-  n_Store_API -->|"TLS/PostgreSQL"| n_PostgreSQL
-  n_Store_API -->|"HTTPS"| n_Media_Bucket
-  n_Store_SPA -->|"HTTPS"| n_Media_Bucket
+  n_Web_SPA_Host["Web SPA Host<br/>React 19 static build (S3 + CloudFront)"]
+  n_Store_API["Store API<br/>FastAPI 0.115 on AWS ECS Fargate (uvicorn)"]
+  n_PostgreSQL["PostgreSQL<br/>AWS RDS for PostgreSQL 16"]
+  n_Media_Storage["Media Storage<br/>AWS S3 bucket"]
+  n_Stripe["Stripe<br/>Stripe payments API"]
+  n_SendGrid["SendGrid<br/>SendGrid email API"]
+  n_Web_SPA_Host -->|"HTTPS"| n_Store_API
+  n_Store_API -->|"TLS/5432"| n_PostgreSQL
+  n_Store_API -->|"HTTPS"| n_Media_Storage
+  n_Store_API -->|"HTTPS"| n_Stripe
+  n_Store_API -->|"HTTPS"| n_SendGrid
+  n_Web_SPA_Host -->|"HTTPS"| n_Media_Storage
 ```
 <!-- sdlc:auto:end topology -->

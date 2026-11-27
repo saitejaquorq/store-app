@@ -17,9 +17,9 @@
 | category_id | uuid | False | category.id | False |
 | name | varchar | False | — | False |
 | description | text | False | — | True |
-| price | numeric | False | — | False |
+| price | numeric(10,2) | False | — | False |
+| is_active | boolean | False | — | False |
 | created_at | timestamptz | False | — | False |
-| updated_at | timestamptz | False | — | False |
 
 ### product_variant
 
@@ -30,6 +30,7 @@
 | size | varchar | False | — | False |
 | colour | varchar | False | — | False |
 | stock_quantity | integer | False | — | False |
+| sku | varchar | False | — | True |
 
 ### product_image
 
@@ -38,29 +39,28 @@
 | id | uuid | True | — | False |
 | product_id | uuid | False | product.id | False |
 | s3_key | varchar | False | — | False |
-| url | varchar | False | — | False |
 | position | integer | False | — | False |
 
-### customer_order
+### order
 
 | Field | Type | PK | FK | Nullable |
 |---|---|---|---|---|
 | id | uuid | True | — | False |
-| order_reference | varchar | False | — | False |
+| reference | varchar | False | — | False |
 | email | varchar | False | — | False |
 | shipping_name | varchar | False | — | False |
-| shipping_line1 | varchar | False | — | False |
-| shipping_line2 | varchar | False | — | True |
+| shipping_address_line1 | varchar | False | — | False |
+| shipping_address_line2 | varchar | False | — | True |
 | shipping_city | varchar | False | — | False |
 | shipping_postcode | varchar | False | — | False |
 | shipping_country | varchar | False | — | False |
-| subtotal | numeric | False | — | False |
-| shipping_amount | numeric | False | — | False |
-| tax_amount | numeric | False | — | False |
-| grand_total | numeric | False | — | False |
+| subtotal | numeric(10,2) | False | — | False |
+| shipping_amount | numeric(10,2) | False | — | False |
+| tax_amount | numeric(10,2) | False | — | False |
+| grand_total | numeric(10,2) | False | — | False |
 | currency | varchar | False | — | False |
 | fulfilment_stage | varchar | False | — | False |
-| stripe_payment_intent_id | varchar | False | — | True |
+| payment_reference | varchar | False | — | True |
 | created_at | timestamptz | False | — | False |
 
 ### order_item
@@ -68,14 +68,14 @@
 | Field | Type | PK | FK | Nullable |
 |---|---|---|---|---|
 | id | uuid | True | — | False |
-| order_id | uuid | False | customer_order.id | False |
+| order_id | uuid | False | order.id | False |
 | variant_id | uuid | False | product_variant.id | True |
 | product_name | varchar | False | — | False |
 | size | varchar | False | — | False |
 | colour | varchar | False | — | False |
-| unit_price | numeric | False | — | False |
+| unit_price | numeric(10,2) | False | — | False |
 | quantity | integer | False | — | False |
-| line_total | numeric | False | — | False |
+| line_total | numeric(10,2) | False | — | False |
 
 ### admin_user
 
@@ -84,6 +84,7 @@
 | id | uuid | True | — | False |
 | username | varchar | False | — | False |
 | password_hash | varchar | False | — | False |
+| is_active | boolean | False | — | False |
 | created_at | timestamptz | False | — | False |
 
 ### admin_session
@@ -92,8 +93,9 @@
 |---|---|---|---|---|
 | token | varchar | True | — | False |
 | admin_user_id | uuid | False | admin_user.id | False |
-| expires_at | timestamptz | False | — | False |
 | created_at | timestamptz | False | — | False |
+| expires_at | timestamptz | False | — | False |
+| revoked_at | timestamptz | False | — | True |
 
 ### store_config
 
@@ -102,9 +104,9 @@
 | id | integer | True | — | False |
 | country | varchar | False | — | True |
 | currency | varchar | False | — | True |
-| tax_rate | numeric | False | — | True |
-| flat_shipping_amount | numeric | False | — | False |
-| free_shipping_threshold | numeric | False | — | False |
+| tax_rate | numeric(5,4) | False | — | True |
+| flat_shipping_amount | numeric(10,2) | False | — | True |
+| free_shipping_threshold | numeric(10,2) | False | — | True |
 | pending_confirmation | boolean | False | — | False |
 <!-- sdlc:auto:end entities -->
 
@@ -114,7 +116,7 @@
 | category | product | one-to-many |
 | product | product_variant | one-to-many |
 | product | product_image | one-to-many |
-| customer_order | order_item | one-to-many |
+| order | order_item | one-to-many |
 | product_variant | order_item | one-to-many |
 | admin_user | admin_session | one-to-many |
 <!-- sdlc:auto:end relationships -->
@@ -132,9 +134,9 @@ erDiagram
     uuid category_id FK
     varchar name
     text description
-    numeric price
+    numeric_10_2_ price
+    boolean is_active
     timestamptz created_at
-    timestamptz updated_at
   }
   product_variant {
     uuid id PK
@@ -142,31 +144,31 @@ erDiagram
     varchar size
     varchar colour
     integer stock_quantity
+    varchar sku
   }
   product_image {
     uuid id PK
     uuid product_id FK
     varchar s3_key
-    varchar url
     integer position
   }
-  customer_order {
+  order {
     uuid id PK
-    varchar order_reference
+    varchar reference
     varchar email
     varchar shipping_name
-    varchar shipping_line1
-    varchar shipping_line2
+    varchar shipping_address_line1
+    varchar shipping_address_line2
     varchar shipping_city
     varchar shipping_postcode
     varchar shipping_country
-    numeric subtotal
-    numeric shipping_amount
-    numeric tax_amount
-    numeric grand_total
+    numeric_10_2_ subtotal
+    numeric_10_2_ shipping_amount
+    numeric_10_2_ tax_amount
+    numeric_10_2_ grand_total
     varchar currency
     varchar fulfilment_stage
-    varchar stripe_payment_intent_id
+    varchar payment_reference
     timestamptz created_at
   }
   order_item {
@@ -176,35 +178,37 @@ erDiagram
     varchar product_name
     varchar size
     varchar colour
-    numeric unit_price
+    numeric_10_2_ unit_price
     integer quantity
-    numeric line_total
+    numeric_10_2_ line_total
   }
   admin_user {
     uuid id PK
     varchar username
     varchar password_hash
+    boolean is_active
     timestamptz created_at
   }
   admin_session {
     varchar token PK
     uuid admin_user_id FK
-    timestamptz expires_at
     timestamptz created_at
+    timestamptz expires_at
+    timestamptz revoked_at
   }
   store_config {
     integer id PK
     varchar country
     varchar currency
-    numeric tax_rate
-    numeric flat_shipping_amount
-    numeric free_shipping_threshold
+    numeric_5_4_ tax_rate
+    numeric_10_2_ flat_shipping_amount
+    numeric_10_2_ free_shipping_threshold
     boolean pending_confirmation
   }
   category ||--o{ product : "one-to-many"
   product ||--o{ product_variant : "one-to-many"
   product ||--o{ product_image : "one-to-many"
-  customer_order ||--o{ order_item : "one-to-many"
+  order ||--o{ order_item : "one-to-many"
   product_variant ||--o{ order_item : "one-to-many"
   admin_user ||--o{ admin_session : "one-to-many"
 ```

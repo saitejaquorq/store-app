@@ -7,219 +7,129 @@
 
 ### ARCH-OVERVIEW · approved · source: architecture:summary
 
-Approved v1 architecture for a lightweight, mobile-responsive clothing store: React 19 SPA, FastAPI 0.115 backend, PostgreSQL 16, all on AWS.
+Mobile-responsive React 19 SPA on its own origin talking to a FastAPI 0.115 API, backed by PostgreSQL 16, all on AWS.
 
-Customers browse a category catalogue, view product detail with size/colour variants and per-variant stock, build a client-side cart, and check out as guests paying by card through Stripe. Each paid order gets a unique reference and a SendGrid confirmation email, and can be tracked without login by reference plus email. Admins sign in to a protected area (opaque server-side session token) to manage products, variants, images (S3 media bucket), orders/fulfilment stages, and store-wide country/currency, flat-rate shipping with free-shipping threshold, and a single tax rate.
+Customers browse by category, view products with size/colour variants and stock, cart, and guest-checkout with card payment via Stripe; each paid order gets a unique reference and a SendGrid confirmation email, and can be tracked by reference plus email. Admins sign in (server-side opaque-token sessions) to manage products, variants, images (S3), orders and fulfilment stages, and configure country/currency, flat-rate shipping with free-over-threshold, and one tax rate.
 
-**Related:** COMP-SPA, COMP-API, COMP-DB, COMP-MEDIA, COMP-PAYMENT, COMP-EMAIL
+### ARCH-COMP-web_spa · approved · source: architecture:component:web_spa
 
-### COMP-SPA · approved · source: architecture:components.spa
+Customer & Admin Web SPA built in React 19.
 
-Mobile-responsive React 19 single-page app serving both the customer storefront and the protected admin area.
+Mobile-responsive storefront (browse, product, cart, checkout, order tracking) and protected admin UI. Stores the opaque admin session token and sends it as Authorization: Bearer on admin calls. Reads API base URL from VITE_API_BASE_URL.
 
-Serves catalogue, product detail, cart, checkout and order-tracking screens for customers plus the admin management UI. Holds the shopping cart entirely client-side (no server cart entity) and stores the admin session token after login.
+**Related:** ARCH-COMP-api
 
-**Related:** COMP-API
+### ARCH-COMP-api · approved · source: architecture:component:api
 
-### COMP-API · approved · source: architecture:components.api
+Store API built with FastAPI 0.115.
 
-FastAPI 0.115 backend exposing catalogue, pricing, checkout/payment, order tracking, and admin auth/management endpoints.
+Serves catalogue, cart pricing, checkout/payment orchestration, order reference generation, order lookup, admin auth/sessions, catalogue and order management, and store configuration; enforces single-country shipping and stock rules.
 
-Enforces business rules server-side: stock availability, shipping/tax calculation rules, and order-lookup guarding (reference+email match required). Orchestrates calls to Stripe for payment and SendGrid for confirmation email, and persists all state to PostgreSQL.
+**Related:** ARCH-COMP-db, ARCH-COMP-payment, ARCH-COMP-email, ARCH-COMP-media_store
 
-**Related:** COMP-DB, COMP-MEDIA, COMP-PAYMENT, COMP-EMAIL, COMP-SPA, CP-CHECKOUT, CP-TRACKING, CP-ADMIN-AUTH, CP-IMAGE-UPLOAD
+### ARCH-COMP-db · approved · source: architecture:component:db
 
-### COMP-DB · approved · source: architecture:components.db
+PostgreSQL 16 database.
 
-PostgreSQL 16 database holding all persistent store state.
+Persists products, variants, stock, categories, orders, order items, admin users, sessions and store configuration.
 
-Stores products, variants, product images metadata, orders, order items, admin users, admin sessions and the single-row store configuration (country, currency, tax rate, shipping rules).
+### ARCH-COMP-media_store · approved · source: architecture:component:media_store
 
-**Related:** COMP-API, DATA-MODEL
+Product media storage using AWS S3.
 
-### COMP-MEDIA · approved · source: architecture:components.media_store
+Stores and serves uploaded product images; this is the app's own media storage on AWS.
 
-AWS S3 bucket holding uploaded product images as the app's own media storage.
+### ARCH-COMP-payment · approved · source: architecture:component:payment
 
-Receives images uploaded by admins via the API, and serves the resulting image URLs to the storefront SPA for product display.
+Stripe is the payment provider.
 
-**Related:** COMP-API, COMP-SPA
+Takes card payment for the grand total at checkout; the store never stores card details.
 
-### COMP-PAYMENT · approved · source: architecture:components.payment
+### ARCH-COMP-email · approved · source: architecture:component:email
 
-Stripe is the external payment provider used at checkout.
+SendGrid is the transactional email provider.
 
-Takes card payment for the cart's grand total during checkout. The store does not store card details itself; the resulting Stripe payment intent id is recorded on the order.
+Sends order confirmation emails containing the order reference, items and total.
 
-**Related:** COMP-API, CP-CHECKOUT
+### ARCH-PATH-checkout · approved · source: architecture:critical_path:guest_checkout_and_payment
 
-### COMP-EMAIL · approved · source: architecture:components.email
+Guest checkout and payment flow, including stock re-validation, totals, payment, and order creation.
 
-SendGrid is the external transactional email provider.
+Customer submits email, in-country shipping address and cart. API re-validates stock and recomputes totals (subtotal + flat-rate or free shipping + tax), takes card payment via Stripe, and on success atomically decrements stock, generates a unique order reference, and queues the confirmation email. Payment failure or sold-out stock blocks order creation and preserves the cart.
 
-Sends the order confirmation email after a successful checkout, containing the order reference, ordered items and total.
+**Related:** ARCH-COMP-api, ARCH-COMP-payment, ARCH-COMP-db, ARCH-COMP-email
 
-**Related:** COMP-API, CP-CHECKOUT
+### ARCH-PATH-admin-auth · approved · source: architecture:critical_path:admin_signin_and_session
 
-### CP-CHECKOUT · approved · source: architecture:critical_paths.guest_checkout_and_payment
+Admin sign-in and session lifecycle using server-side opaque tokens.
 
-End-to-end guest checkout: price, confirm stock, pay, then create the order.
+Admin submits username/password; API verifies the bcrypt hash, creates a server-side session row with an opaque token and expiry, and returns the token in the body. The SPA stores it and sends it as Bearer on admin calls; a dependency validates the token and sliding expiry; sign-out revokes the session.
 
-Customer submits email, in-country shipping address and card. The API prices the cart (subtotal, flat-rate shipping or free over threshold, single tax rate), confirms stock, takes payment via Stripe, and only then creates the order with a unique reference, decrements stock and triggers the confirmation email. A failed payment or a sold-out variant blocks order creation and preserves the cart.
+**Related:** ARCH-COMP-api, ARCH-COMP-db, ARCH-COMP-web_spa
 
-**Related:** COMP-API, COMP-PAYMENT, COMP-EMAIL, COMP-DB, COMP-SPA, API-CHECKOUT
+### ARCH-PATH-tracking · approved · source: architecture:critical_path:order_tracking
 
-### CP-TRACKING · approved · source: architecture:critical_paths.order_tracking_by_reference_and_email
+Order tracking by reference and email, with a non-revealing failure message.
 
-Guests track an order without login using reference plus email.
+Customer enters order reference and email; API returns order items and current fulfilment stage only when both match, and a single non-revealing message otherwise.
 
-Customer submits order reference and email; the API returns order items and current fulfilment stage only when both match. A single generic not-found message is returned otherwise, so neither value is revealed as the mismatched one.
+**Related:** ARCH-COMP-api, ARCH-COMP-db
 
-**Related:** COMP-API, COMP-DB, API-TRACKING
+### ARCH-ENTITIES · approved · source: architecture:entities
 
-### CP-ADMIN-AUTH · approved · source: architecture:critical_paths.admin_sign_in_and_session_protection
+Data model entities persisted in PostgreSQL.
 
-Admin authentication via hashed credentials and an opaque server-side session token.
+category(id, name, slug); product(id, category_id, name, description, price, is_active, created_at); product_variant(id, product_id, size, colour, stock_quantity, sku); product_image(id, product_id, s3_key, position); order(id, reference, email, shipping_name, shipping_address_line1, shipping_address_line2, shipping_city, shipping_postcode, shipping_country, subtotal, shipping_amount, tax_amount, grand_total, currency, fulfilment_stage, payment_reference, created_at); order_item(id, order_id, variant_id, product_name, size, colour, unit_price, quantity, line_total); admin_user(id, username, password_hash, is_active, created_at); admin_session(token, admin_user_id, created_at, expires_at, revoked_at); store_config(id, country, currency, tax_rate, flat_shipping_amount, free_shipping_threshold, pending_confirmation).
 
-Admin signs in with username and password verified against a hashed credential; the API issues an opaque session token returned in the response body, which the SPA stores and sends as a Bearer token. Protected endpoints validate the token and its expiry; sign-out revokes the token server-side.
+**Related:** ARCH-COMP-db
 
-**Related:** COMP-API, COMP-DB, COMP-SPA, API-ADMIN-AUTH
+### ARCH-ENDPOINTS · approved · source: architecture:endpoints
 
-### CP-IMAGE-UPLOAD · approved · source: architecture:critical_paths.product_image_upload
+API endpoint inventory covering storefront, checkout, tracking and admin management.
 
-Signed-in admins upload and remove product images, stored in S3.
+GET /categories; GET /categories/{slug}/products; GET /products/{id}; POST /cart/validate; POST /checkout/quote; POST /checkout; POST /orders/lookup; POST /admin/login; POST /admin/logout; GET /admin/products; POST /admin/products; PUT /admin/products/{id}; POST /admin/products/{id}/variants; POST /admin/products/{id}/images; DELETE /admin/products/{id}/images/{image_id}; GET /admin/orders; GET /admin/orders/{id}; PATCH /admin/orders/{id}/stage; GET /admin/config; PUT /admin/config.
 
-Signed-in admin uploads one or more images; the API validates and stores each object in the S3 media bucket and records its metadata against the product. Removing an image deletes both the S3 object and its database record.
+**Related:** ARCH-COMP-api
 
-**Related:** COMP-API, COMP-MEDIA, COMP-SPA, API-ADMIN-PRODUCTS
+### ARCH-DEPLOYMENT-NODES · approved · source: architecture:deployment_nodes
 
-### DATA-MODEL · approved · source: architecture:entities
+AWS-hosted deployment topology for all components plus two SaaS integrations.
 
-Relational data model covering catalogue, orders, admin access and store configuration.
+Web SPA Host: React 19 static build on S3 + CloudFront. Store API: FastAPI 0.115 on AWS ECS Fargate (uvicorn), Python 3.12. PostgreSQL: AWS RDS for PostgreSQL 16. Media Storage: AWS S3 bucket. Stripe: Stripe payments API (SaaS). SendGrid: SendGrid email API (SaaS).
 
-category(id, name, slug); product(id, category_id, name, description, price, created_at, updated_at); product_variant(id, product_id, size, colour, stock_quantity); product_image(id, product_id, s3_key, url, position); customer_order(id, order_reference, email, shipping_name, shipping_line1, shipping_line2, shipping_city, shipping_postcode, shipping_country, subtotal, shipping_amount, tax_amount, grand_total, currency, fulfilment_stage, stripe_payment_intent_id, created_at); order_item(id, order_id, variant_id, product_name, size, colour, unit_price, quantity, line_total); admin_user(id, username, password_hash, created_at); admin_session(token, admin_user_id, expires_at, created_at); store_config(id, country, currency, tax_rate, flat_shipping_amount, free_shipping_threshold, pending_confirmation).
+**Related:** ARCH-COMP-web_spa, ARCH-COMP-api, ARCH-COMP-db, ARCH-COMP-media_store, ARCH-COMP-payment, ARCH-COMP-email
 
-**Related:** COMP-DB
+### ARCH-DECISION-frontend · approved · source: architecture:technology_decision:frontend
 
-### API-CATALOG · approved · source: architecture:endpoints
+React 19 chosen as the frontend framework over Vue or SvelteKit.
 
-Public storefront catalogue endpoints.
+Approved stack; built as a mobile-responsive SPA (Vite) served from its own origin, storing the admin opaque token and sending it as Authorization: Bearer.
 
-GET /categories - list categories. GET /categories/{slug}/products - list available products in a category with thumbnail, name and price; empty category returns an empty array. GET /products/{id} - product detail with images, description, price and variants including per-variant stock availability.
+**Related:** ARCH-COMP-web_spa
 
-**Related:** COMP-API, DATA-MODEL
+### ARCH-DECISION-backend · approved · source: architecture:technology_decision:backend
 
-### API-CHECKOUT · approved · source: architecture:endpoints
+FastAPI 0.115 chosen as the backend framework over Django REST Framework or Flask.
 
-Cart pricing and checkout endpoints.
+Approved stack; hosts catalogue, checkout orchestration, Stripe/SendGrid/S3 integration, admin auth and session validation with Pydantic validation for checkout and product forms.
 
-POST /checkout/quote - price a cart: subtotal, flat-rate or free shipping, tax and grand total in store currency. POST /checkout - validate stock and in-country address, take card payment via Stripe, create the order and send the confirmation email.
+**Related:** ARCH-COMP-api
 
-**Related:** COMP-API, CP-CHECKOUT
+### ARCH-DECISION-database · approved · source: architecture:technology_decision:database
 
-### API-TRACKING · approved · source: architecture:endpoints
+PostgreSQL 16 chosen as the database over MySQL or SQLite.
 
-Guest order-tracking endpoint.
+Approved stack; relational model fits products, variants, orders and transactional stock decrement with a unique order reference index. Full catalogue, orders and config all live here.
 
-POST /orders/track - returns order items and current fulfilment stage only when reference and email both match; generic not-found response otherwise.
+**Related:** ARCH-COMP-db
 
-**Related:** COMP-API, CP-TRACKING
+### ARCH-DECISION-cloud · approved · source: architecture:technology_decision:cloud
 
-### API-ADMIN-AUTH · approved · source: architecture:endpoints
+AWS chosen as the cloud provider over GCP or Azure.
 
-Admin authentication endpoints.
+Approved stack; RDS for PostgreSQL 16, S3 for the app's own product media storage, ECS Fargate for the API and S3/CloudFront for the SPA.
 
-POST /admin/login - admin sign-in; returns an opaque session token in the body on success, generic error otherwise. POST /admin/logout - revokes the current admin session token server-side.
-
-**Related:** COMP-API, CP-ADMIN-AUTH
-
-### API-ADMIN-PRODUCTS · approved · source: architecture:endpoints
-
-Admin endpoints for managing products, variants and images.
-
-GET /admin/products - list products for admin management. POST /admin/products - create a product with name, category, description and price; validation errors returned for missing name or invalid price. PUT /admin/products/{id} - edit a product's name, category, description or price. POST /admin/products/{id}/variants - add or update size/colour variants and per-variant stock. POST /admin/products/{id}/images - upload one or more product images to S3 media storage. DELETE /admin/products/{id}/images/{image_id} - delete a product image from storage and the product.
-
-**Related:** COMP-API, COMP-MEDIA, CP-IMAGE-UPLOAD, DATA-MODEL
-
-### API-ADMIN-ORDERS · approved · source: architecture:endpoints
-
-Admin endpoints for viewing and fulfilling orders.
-
-GET /admin/orders - list placed orders with reference, email, total, date and current stage. GET /admin/orders/{id} - order detail with items, variants, quantities, totals, shipping address and stage. PATCH /admin/orders/{id}/stage - advance an order to a later fulfilment stage, recorded manually within the app.
-
-**Related:** COMP-API, CP-CHECKOUT, DATA-MODEL
-
-### API-ADMIN-CONFIG · approved · source: architecture:endpoints
-
-Admin endpoints for store-wide configuration.
-
-GET /admin/config - read store configuration (country, currency, tax rate, shipping flat rate and threshold). PUT /admin/config - update country, currency, tax rate, flat shipping amount and free-shipping threshold.
-
-**Related:** COMP-API, DATA-MODEL
-
-### DEPLOY-SPA · approved · source: architecture:deployment_nodes.store_spa
-
-Store SPA is deployed as a static React build.
-
-React static site hosted on S3 + CloudFront, serving the static assets produced by the React 19 build.
-
-**Related:** COMP-SPA
-
-### DEPLOY-API · approved · source: architecture:deployment_nodes.store_api
-
-Store API runs as a containerized FastAPI service.
-
-Deployed on AWS App Runner as a Python 3.12 container running FastAPI 0.115 under Uvicorn.
-
-**Related:** COMP-API
-
-### DEPLOY-DB · approved · source: architecture:deployment_nodes.postgresql
-
-Managed PostgreSQL 16 database.
-
-Hosted on Amazon RDS for PostgreSQL 16.
-
-**Related:** COMP-DB
-
-### DEPLOY-MEDIA · approved · source: architecture:deployment_nodes.media_bucket
-
-Product media object storage.
-
-Hosted on Amazon S3 as general object storage for uploaded product images.
-
-**Related:** COMP-MEDIA
-
-### TECH-FRONTEND · approved · source: architecture:technology_decisions.frontend
-
-React 19 approved as the frontend stack, over Vue and SvelteKit alternatives.
-
-Built as a mobile-responsive SPA (Vite build) covering both storefront and admin, reading the API base URL from VITE_API_BASE_URL and sending the admin session token as a Bearer header.
-
-**Related:** COMP-SPA
-
-### TECH-BACKEND · approved · source: architecture:technology_decisions.backend
-
-FastAPI 0.115 approved as the backend stack, over Django REST Framework and Flask alternatives.
-
-Hosts catalogue, pricing, checkout/payment orchestration, order tracking and admin management, with Pydantic validation for checkout and product forms.
-
-**Related:** COMP-API
-
-### TECH-DATABASE · approved · source: architecture:technology_decisions.database
-
-PostgreSQL 16 approved as the database, over MySQL and SQLite alternatives.
-
-Stores catalogue, orders, admin users, sessions and the single-row store config; uses numeric money columns and transactional stock decrement at checkout.
-
-**Related:** COMP-DB
-
-### TECH-CLOUD · approved · source: architecture:technology_decisions.cloud
-
-AWS approved as the cloud platform, over GCP and Azure alternatives.
-
-SPA on S3+CloudFront, API on App Runner, RDS for PostgreSQL 16, and product media in a dedicated S3 bucket as the app's own media storage.
-
-**Related:** COMP-SPA, COMP-API, COMP-DB, COMP-MEDIA
+**Related:** ARCH-COMP-db, ARCH-COMP-media_store, ARCH-COMP-api, ARCH-COMP-web_spa
 <!-- sdlc:auto:end narrative -->
 
 <!-- sdlc:auto:start building-blocks -->
@@ -227,26 +137,26 @@ SPA on S3+CloudFront, API on App Runner, RDS for PostgreSQL 16, and product medi
 
 | ID | Name | Technology | Responsibility | Depends on |
 |---|---|---|---|---|
-| spa | Store & Admin SPA | React 19 | Mobile-responsive React app serving the customer storefront (catalogue, product, cart, checkout, order tracking) and the protected admin area. Holds the cart client-side and stores the admin session token. | api |
-| api | Store API | FastAPI 0.115 | FastAPI backend exposing catalogue, cart pricing, checkout/payment, order creation, order tracking, admin auth and admin management endpoints. Enforces stock, shipping/tax rules and order-lookup guarding. | db, media_store, payment, email |
-| db | PostgreSQL Database | PostgreSQL 16 | Stores products, variants, images metadata, orders, order items, admin users, admin sessions and store configuration. | — |
-| media_store | Media Object Store | AWS S3 | Holds uploaded product images in the app's own media storage on AWS; serves image URLs to the storefront. | — |
-| payment | Stripe Payment Provider | Stripe | Takes card payment for the grand total at checkout; no card details are stored by the store. | — |
-| email | SendGrid Email Provider | SendGrid | Sends transactional order confirmation emails containing the order reference, items and total. | — |
+| web_spa | Customer & Admin Web SPA | React 19 | Mobile-responsive storefront (browse, product, cart, checkout, order tracking) and protected admin UI; stores the opaque session token and sends it as Authorization: Bearer on admin calls; reads API base URL from VITE_API_BASE_URL. | api |
+| api | Store API | FastAPI 0.115 | Serves catalogue, cart pricing, checkout/payment orchestration, order reference generation, order lookup, admin auth/sessions, catalogue and order management, and store configuration; enforces single-country shipping and stock rules. | db, payment, email, media_store |
+| db | PostgreSQL Database | PostgreSQL 16 | Persists products, variants, stock, categories, orders, order items, admin users, sessions and store configuration. | — |
+| media_store | Product Media Storage | AWS S3 | Stores and serves uploaded product images (the app's own media storage on AWS). | — |
+| payment | Payment Provider | Stripe | Takes card payment for the grand total at checkout; the store never stores card details. | — |
+| email | Transactional Email | SendGrid | Sends order confirmation emails containing the reference, items and total. | — |
 
 ```mermaid
 graph TD
-  c_spa["Store & Admin SPA"]
+  c_web_spa["Customer & Admin Web SPA"]
   c_api["Store API"]
   c_db["PostgreSQL Database"]
-  c_media_store["Media Object Store"]
-  c_payment["Stripe Payment Provider"]
-  c_email["SendGrid Email Provider"]
-  c_spa --> c_api
+  c_media_store["Product Media Storage"]
+  c_payment["Payment Provider"]
+  c_email["Transactional Email"]
+  c_web_spa --> c_api
   c_api --> c_db
-  c_api --> c_media_store
   c_api --> c_payment
   c_api --> c_email
+  c_api --> c_media_store
 ```
 <!-- sdlc:auto:end building-blocks -->
 
@@ -255,94 +165,72 @@ graph TD
 
 ### Guest checkout and payment
 
-Customer submits email, in-country shipping address and card. The API prices the cart (subtotal, flat-rate shipping or free over threshold, single tax rate), confirms stock, takes payment via Stripe, and only then creates the order with a unique reference, decrements stock and triggers the confirmation email. Failed payment or a sold-out variant blocks order creation and preserves the cart.
+Customer submits email, in-country shipping address and cart; API re-validates stock and recomputes totals (subtotal + flat-rate or free shipping + tax), takes card payment via Stripe, and on success atomically decrements stock, generates a unique order reference, and queues the confirmation email. Payment failure or sold-out stock blocks order creation and preserves the cart.
 
-- **Components:** spa, api, db, payment, email
-- **Modules:** checkout_router, pricing_service, stock_service, payment_service, order_service, email_service
-- **Key functions:** quote_cart(items, config), reserve_and_validate_stock(items), create_payment_intent(amount, currency), confirm_payment(intent_id), place_order(email, address, items, totals), generate_order_reference(), send_confirmation_email(order)
+- **Components:** web_spa, api, db, payment, email
+- **Modules:** checkout_router, pricing_service, stock_service, order_service, payment_service, email_service
+- **Key functions:** quote_totals(cart, config), validate_in_country(address, config), reserve_and_check_stock(cart), take_payment(amount, currency, token), create_order(email, address, items, totals), generate_order_reference(), send_confirmation(order)
 
 ```mermaid
 sequenceDiagram
-  participant C as SPA
-  participant A as API
-  participant D as DB
+  participant C as Customer SPA
+  participant A as Store API
+  participant D as PostgreSQL
   participant P as Stripe
-  participant M as SendGrid
-  C->>A: POST /checkout/quote cart
-  A->>D: load variants, stock, config
-  A-->>C: subtotal, shipping, tax, total
-  C->>A: POST /checkout with email, address, payment
-  A->>D: re-check stock for each variant
-  A->>P: create and confirm payment intent
+  participant E as SendGrid
+  C->>A: POST /checkout (email, address, cart, payment token)
+  A->>D: re-check variant stock
+  A->>A: compute subtotal, shipping, tax, total
+  A->>P: charge grand total
   P-->>A: payment succeeded
-  A->>D: create order, items, decrement stock
-  A->>M: send confirmation email
+  A->>D: decrement stock and create order with reference
+  A->>E: send confirmation email
   A-->>C: order reference and summary
+```
+
+### Admin sign-in and session
+
+Admin submits username/password; API verifies the bcrypt hash, creates a server-side session row with an opaque token and expiry, and returns the token in the body. The SPA stores it and sends it as Bearer on admin calls; a dependency validates the token and sliding expiry, and sign-out revokes the session.
+
+- **Components:** web_spa, api, db
+- **Modules:** auth_router, session_service, password_hasher, auth_dependency
+- **Key functions:** verify_credentials(username, password), create_session(admin_id), require_admin(token), revoke_session(token)
+
+```mermaid
+sequenceDiagram
+  participant Ad as Admin SPA
+  participant A as Store API
+  participant D as PostgreSQL
+  Ad->>A: POST /admin/login (username, password)
+  A->>D: load admin and password hash
+  A->>A: verify hash, generic error on mismatch
+  A->>D: insert session with opaque token and expiry
+  A-->>Ad: token in response body
+  Ad->>A: GET /admin/orders (Authorization Bearer token)
+  A->>D: validate token and expiry
+  A-->>Ad: order list
 ```
 
 ### Order tracking by reference and email
 
-Customer submits order reference and email; the API returns order items and current fulfilment stage only when both match, with a single generic not-found message otherwise so neither value is revealed as the mismatch.
+Customer enters order reference and email; API returns order items and current fulfilment stage only when both match, and a single non-revealing message otherwise.
 
-- **Components:** spa, api, db
+- **Components:** web_spa, api, db
 - **Modules:** tracking_router, order_service
-- **Key functions:** lookup_order(reference, email), to_tracking_view(order)
+- **Key functions:** lookup_order(reference, email)
 
 ```mermaid
 sequenceDiagram
-  participant C as SPA
-  participant A as API
-  participant D as DB
-  C->>A: POST /orders/track with reference and email
-  A->>D: select order by reference and email
-  alt match found
-    A-->>C: items and current fulfilment stage
-  else no match
-    A-->>C: generic no matching order message
+  participant C as Customer SPA
+  participant A as Store API
+  participant D as PostgreSQL
+  C->>A: POST /orders/lookup (reference, email)
+  A->>D: find order by reference and matching email
+  alt match
+    A-->>C: stage and items
+  else no match or missing
+    A-->>C: generic not-found message
   end
-```
-
-### Admin sign-in and session protection
-
-Admin signs in with username and password verified against a hashed credential; the API issues an opaque session token returned in the body, stored by the SPA and sent as a Bearer token. Protected endpoints validate the token and its expiry; sign-out revokes it server-side.
-
-- **Components:** spa, api, db
-- **Modules:** auth_router, session_service, password_service, auth_dependency
-- **Key functions:** verify_password(input, hash), create_session(admin_id), require_admin(token), revoke_session(token)
-
-```mermaid
-sequenceDiagram
-  participant C as SPA
-  participant A as API
-  participant D as DB
-  C->>A: POST /admin/login username and password
-  A->>D: load admin by username
-  A->>A: verify hashed password
-  A->>D: create session with expiry
-  A-->>C: opaque session token in body
-  C->>A: GET /admin/orders with Bearer token
-  A->>D: validate token and expiry
-  A-->>C: order list
-```
-
-### Product image upload
-
-Signed-in admin uploads one or more images; the API validates and stores each object in the S3 media bucket and records its metadata against the product. Removing an image deletes the object and its record.
-
-- **Components:** spa, api, media_store, db
-- **Modules:** admin_product_router, image_service
-- **Key functions:** upload_product_image(product_id, file), delete_product_image(image_id)
-
-```mermaid
-sequenceDiagram
-  participant C as SPA
-  participant A as API
-  participant S as S3
-  participant D as DB
-  C->>A: POST /admin/products/{id}/images multipart
-  A->>S: put object image
-  A->>D: insert image record with key and url
-  A-->>C: stored image metadata
 ```
 <!-- sdlc:auto:end runtime -->
 
@@ -351,28 +239,36 @@ sequenceDiagram
 
 | Name | Service | Runtime | Scaling | Environment |
 |---|---|---|---|---|
-| Store SPA | React static site on S3 + CloudFront | Static assets (React 19 build) | CDN edge cache | dev |
-| Store API | FastAPI on AWS App Runner | Python 3.12 container (FastAPI 0.115, Uvicorn) | 1 instance, auto-scale on request volume | dev |
-| PostgreSQL | Amazon RDS for PostgreSQL 16 | PostgreSQL 16 | Single db.t-class instance, encrypted at rest | dev |
-| Media Bucket | Amazon S3 | Object storage | Managed | dev |
+| Web SPA Host | React 19 static build (S3 + CloudFront) | Static site | CDN edge cache | dev |
+| Store API | FastAPI 0.115 on AWS ECS Fargate (uvicorn) | Python 3.12 | 1 task in dev, horizontal later | dev |
+| PostgreSQL | AWS RDS for PostgreSQL 16 | PostgreSQL 16 | Single instance, encryption at rest enabled | dev |
+| Media Storage | AWS S3 bucket | S3 | Managed | dev |
+| Stripe | Stripe payments API | SaaS | Managed | dev |
+| SendGrid | SendGrid email API | SaaS | Managed | dev |
 
 | Source | Target | Protocol |
 |---|---|---|
-| Store SPA | Store API | HTTPS |
-| Store API | PostgreSQL | TLS/PostgreSQL |
-| Store API | Media Bucket | HTTPS |
-| Store SPA | Media Bucket | HTTPS |
+| Web SPA Host | Store API | HTTPS |
+| Store API | PostgreSQL | TLS/5432 |
+| Store API | Media Storage | HTTPS |
+| Store API | Stripe | HTTPS |
+| Store API | SendGrid | HTTPS |
+| Web SPA Host | Media Storage | HTTPS |
 
 ```mermaid
 graph LR
-  n_Store_SPA["Store SPA<br/>React static site on S3 + CloudFront"]
-  n_Store_API["Store API<br/>FastAPI on AWS App Runner"]
-  n_PostgreSQL["PostgreSQL<br/>Amazon RDS for PostgreSQL 16"]
-  n_Media_Bucket["Media Bucket<br/>Amazon S3"]
-  n_Store_SPA -->|"HTTPS"| n_Store_API
-  n_Store_API -->|"TLS/PostgreSQL"| n_PostgreSQL
-  n_Store_API -->|"HTTPS"| n_Media_Bucket
-  n_Store_SPA -->|"HTTPS"| n_Media_Bucket
+  n_Web_SPA_Host["Web SPA Host<br/>React 19 static build (S3 + CloudFront)"]
+  n_Store_API["Store API<br/>FastAPI 0.115 on AWS ECS Fargate (uvicorn)"]
+  n_PostgreSQL["PostgreSQL<br/>AWS RDS for PostgreSQL 16"]
+  n_Media_Storage["Media Storage<br/>AWS S3 bucket"]
+  n_Stripe["Stripe<br/>Stripe payments API"]
+  n_SendGrid["SendGrid<br/>SendGrid email API"]
+  n_Web_SPA_Host -->|"HTTPS"| n_Store_API
+  n_Store_API -->|"TLS/5432"| n_PostgreSQL
+  n_Store_API -->|"HTTPS"| n_Media_Storage
+  n_Store_API -->|"HTTPS"| n_Stripe
+  n_Store_API -->|"HTTPS"| n_SendGrid
+  n_Web_SPA_Host -->|"HTTPS"| n_Media_Storage
 ```
 <!-- sdlc:auto:end deployment-view -->
 

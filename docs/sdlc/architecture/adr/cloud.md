@@ -2,7 +2,7 @@
 # ADR-0004: Use AWS for Cloud
 
 Status: Accepted  
-Date: 2026-11-26
+Date: 2026-11-27
 
 ## Context and Problem Statement
 
@@ -16,9 +16,9 @@ Which Cloud technology does the project use? Decided in architecture v1.
 
 ## Decision Outcome
 
-Chosen option: AWS, because Approved stack. SPA on S3+CloudFront, API on App Runner, RDS PostgreSQL 16, and product media in an S3 bucket as the app's own media storage.
+Chosen option: AWS, because Approved stack; RDS for PostgreSQL 16, S3 for the app's own product media storage, ECS Fargate for the API and S3/CloudFront for the SPA.
 
 ## Consequences
 
-Two origins require CORS on the API; encryption at rest (RDS/S3) and in transit supports the served country's data rules once confirmed.
+Single-region dev setup; multi-AZ/availability hardening deferred beyond the lightweight MVP.
 <!-- sdlc:auto:end adr -->

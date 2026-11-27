@@ -7,21 +7,21 @@ info:
 paths:
   /admin/config:
     get:
-      summary: Read store configuration (country, currency, tax rate, shipping flat
-        rate and threshold).
-      description: Read store configuration (country, currency, tax rate, shipping
-        flat rate and threshold).
+      summary: Read store country, currency, tax rate, flat shipping and free threshold.
+      description: Read store country, currency, tax rate, flat shipping and free
+        threshold.
       operationId: get_admin_config
       parameters: []
       responses:
         '200':
-          description: store_config
+          description: '{country, currency, tax_rate, flat_shipping_amount, free_shipping_threshold,
+            pending_confirmation}'
       security:
       - bearerAuth: []
     put:
-      summary: Update country, currency, tax rate, flat shipping and free-shipping
+      summary: Set country/currency, single tax rate, flat-rate shipping and free-shipping
         threshold.
-      description: Update country, currency, tax rate, flat shipping and free-shipping
+      description: Set country/currency, single tax rate, flat-rate shipping and free-shipping
         threshold.
       operationId: put_admin_config
       parameters: []
@@ -33,15 +33,15 @@ paths:
               description: '{country, currency, tax_rate, flat_shipping_amount, free_shipping_threshold}'
       responses:
         '200':
-          description: store_config
+          description: '{...}'
       security:
       - bearerAuth: []
   /admin/login:
     post:
-      summary: Admin sign-in; returns an opaque session token in the body on success,
-        generic error otherwise.
-      description: Admin sign-in; returns an opaque session token in the body on success,
-        generic error otherwise.
+      summary: Verify username/password and return an opaque session token in the
+        body.
+      description: Verify username/password and return an opaque session token in
+        the body.
       operationId: post_admin_login
       parameters: []
       requestBody:
@@ -52,11 +52,11 @@ paths:
               description: '{username, password}'
       responses:
         '200':
-          description: '{token, expires_at}'
+          description: '{token, expires_at} or generic 401'
   /admin/logout:
     post:
-      summary: Revoke the current admin session token server-side.
-      description: Revoke the current admin session token server-side.
+      summary: Revoke the current session.
+      description: Revoke the current session.
       operationId: post_admin_logout
       parameters: []
       requestBody:
@@ -72,22 +72,21 @@ paths:
       - bearerAuth: []
   /admin/orders:
     get:
-      summary: List placed orders with reference, email, total, date and current stage.
-      description: List placed orders with reference, email, total, date and current
-        stage.
+      summary: List placed orders with reference, email, total, date and stage.
+      description: List placed orders with reference, email, total, date and stage.
       operationId: get_admin_orders
       parameters: []
       responses:
         '200':
-          description: array of order summaries
+          description: '[{reference, email, grand_total, created_at, stage}]'
       security:
       - bearerAuth: []
   /admin/orders/{id}:
     get:
-      summary: Order detail with items, variants, quantities, totals, shipping address
-        and stage.
-      description: Order detail with items, variants, quantities, totals, shipping
-        address and stage.
+      summary: Order detail with items, variants, quantities, totals and shipping
+        address.
+      description: Order detail with items, variants, quantities, totals and shipping
+        address.
       operationId: get_admin_orders_id
       parameters:
       - name: id
@@ -97,15 +96,13 @@ paths:
           type: string
       responses:
         '200':
-          description: order detail
+          description: '{reference, items:[...], totals, shipping_address, stage}'
       security:
       - bearerAuth: []
   /admin/orders/{id}/stage:
     patch:
-      summary: Advance an order to a later fulfilment stage, recorded manually within
-        the app.
-      description: Advance an order to a later fulfilment stage, recorded manually
-        within the app.
+      summary: Advance an order to a later fulfilment stage, recorded in-app.
+      description: Advance an order to a later fulfilment stage, recorded in-app.
       operationId: patch_admin_orders_id_stage
       parameters:
       - name: id
@@ -118,10 +115,10 @@ paths:
           application/json:
             schema:
               type: object
-              description: '{fulfilment_stage}'
+              description: '{stage}'
       responses:
         '200':
-          description: updated order
+          description: '{reference, stage}'
       security:
       - bearerAuth: []
   /admin/products:
@@ -132,14 +129,12 @@ paths:
       parameters: []
       responses:
         '200':
-          description: array of products
+          description: '[{id, name, category, price, is_active}]'
       security:
       - bearerAuth: []
     post:
-      summary: Create a product with name, category, description and price; validation
-        errors returned for missing name or invalid pric
-      description: Create a product with name, category, description and price; validation
-        errors returned for missing name or invalid price.
+      summary: Create a product with name, category, description and price (validated).
+      description: Create a product with name, category, description and price (validated).
       operationId: post_admin_products
       parameters: []
       requestBody:
@@ -150,7 +145,7 @@ paths:
               description: '{name, category_id, description, price}'
       responses:
         '200':
-          description: created product
+          description: '{id, ...} or 422'
       security:
       - bearerAuth: []
   /admin/products/{id}:
@@ -172,13 +167,13 @@ paths:
               description: '{name, category_id, description, price}'
       responses:
         '200':
-          description: updated product
+          description: '{id, ...} or 422'
       security:
       - bearerAuth: []
   /admin/products/{id}/images:
     post:
-      summary: Upload one or more product images to S3 media storage.
-      description: Upload one or more product images to S3 media storage.
+      summary: Upload one or more product images to S3 and attach them.
+      description: Upload one or more product images to S3 and attach them.
       operationId: post_admin_products_id_images
       parameters:
       - name: id
@@ -191,16 +186,16 @@ paths:
           application/json:
             schema:
               type: object
-              description: multipart file(s)
+              description: multipart image file(s)
       responses:
         '200':
-          description: array of {id, url}
+          description: '[{id, url}]'
       security:
       - bearerAuth: []
   /admin/products/{id}/images/{image_id}:
     delete:
-      summary: Delete a product image from storage and the product.
-      description: Delete a product image from storage and the product.
+      summary: Remove an image from the product and delete it from media storage.
+      description: Remove an image from the product and delete it from media storage.
       operationId: delete_admin_products_id_images_image_id
       parameters:
       - name: id
@@ -237,9 +232,26 @@ paths:
               description: '{size, colour, stock_quantity}'
       responses:
         '200':
-          description: variant
+          description: '{id, ...}'
       security:
       - bearerAuth: []
+  /cart/validate:
+    post:
+      summary: Validate requested variant quantities against stock and return the
+        max available where exceeded.
+      description: Validate requested variant quantities against stock and return
+        the max available where exceeded.
+      operationId: post_cart_validate
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: '{items:[{variant_id, quantity}]}'
+      responses:
+        '200':
+          description: '{items:[{variant_id, ok, max_available}]}'
   /categories:
     get:
       summary: List categories for the storefront.
@@ -248,13 +260,13 @@ paths:
       parameters: []
       responses:
         '200':
-          description: array of {id, name, slug}
+          description: '[{id, name, slug}]'
   /categories/{slug}/products:
     get:
-      summary: List available products in a category with thumbnail, name and price;
-        empty-category message handled by empty array.
-      description: List available products in a category with thumbnail, name and
-        price; empty-category message handled by empty array.
+      summary: List active products in a category with thumbnail, name and price;
+        empty list signals the no-products message.
+      description: List active products in a category with thumbnail, name and price;
+        empty list signals the no-products message.
       operationId: get_categories_slug_products
       parameters:
       - name: slug
@@ -264,13 +276,14 @@ paths:
           type: string
       responses:
         '200':
-          description: array of {id, name, price, thumbnail_url}
+          description: '[{id, name, price, thumbnail_url}]'
   /checkout:
     post:
-      summary: Validate stock and in-country address, take card payment via Stripe,
-        create the order and send the confirmation email.
-      description: Validate stock and in-country address, take card payment via Stripe,
-        create the order and send the confirmation email.
+      summary: 'Place a guest order: validate in-country address, re-check stock,
+        take card payment via Stripe, create order with unique'
+      description: 'Place a guest order: validate in-country address, re-check stock,
+        take card payment via Stripe, create order with unique reference and send
+        confirmation email.'
       operationId: post_checkout
       parameters: []
       requestBody:
@@ -278,17 +291,18 @@ paths:
           application/json:
             schema:
               type: object
-              description: '{email, shipping_address, items[], payment_method_id}'
+              description: '{email, shipping_address, items:[{variant_id, quantity}],
+                payment_token}'
       responses:
         '200':
-          description: '{order_reference, grand_total, currency} or payment/stock
-            error'
+          description: '{reference, grand_total, currency} or 402/409 on payment failure
+            or sold-out'
   /checkout/quote:
     post:
-      summary: 'Price a cart: subtotal, flat-rate or free shipping, tax and grand
-        total in store currency.'
-      description: 'Price a cart: subtotal, flat-rate or free shipping, tax and grand
-        total in store currency.'
+      summary: Compute subtotal, flat-rate or free shipping, tax and grand total for
+        a cart in the store currency.
+      description: Compute subtotal, flat-rate or free shipping, tax and grand total
+        for a cart in the store currency.
       operationId: post_checkout_quote
       parameters: []
       requestBody:
@@ -299,32 +313,31 @@ paths:
               description: '{items:[{variant_id, quantity}]}'
       responses:
         '200':
-          description: '{subtotal, shipping_amount, tax_amount, grand_total, currency,
-            issues[]}'
-  /orders/track:
+          description: '{subtotal, shipping_amount, tax_amount, grand_total, currency}'
+  /orders/lookup:
     post:
       summary: Return order items and current fulfilment stage only when reference
-        and email both match; generic not-found otherwise.
+        and email both match; otherwise a generic not-found.
       description: Return order items and current fulfilment stage only when reference
-        and email both match; generic not-found otherwise.
-      operationId: post_orders_track
+        and email both match; otherwise a generic not-found.
+      operationId: post_orders_lookup
       parameters: []
       requestBody:
         content:
           application/json:
             schema:
               type: object
-              description: '{order_reference, email}'
+              description: '{reference, email}'
       responses:
         '200':
-          description: '{order_reference, fulfilment_stage, items[]} or generic no-match
-            message'
+          description: '{reference, stage, items:[...], grand_total, currency} or
+            generic error'
   /products/{id}:
     get:
-      summary: Product detail with images, description, price and variants including
-        per-variant stock availability.
-      description: Product detail with images, description, price and variants including
-        per-variant stock availability.
+      summary: Product detail with images, description, price and variants with per-variant
+        stock/availability.
+      description: Product detail with images, description, price and variants with
+        per-variant stock/availability.
       operationId: get_products_id
       parameters:
       - name: id
@@ -334,8 +347,8 @@ paths:
           type: string
       responses:
         '200':
-          description: '{id, name, description, price, images[], variants[{id, size,
-            colour, in_stock}]}'
+          description: '{id, name, description, price, images:[...], variants:[{id,
+            size, colour, in_stock, available_qty}]}'
 components:
   securitySchemes:
     bearerAuth:
@@ -371,10 +384,9 @@ components:
           type: string
         price:
           type: number
+        is_active:
+          type: boolean
         created_at:
-          type: string
-          format: date-time
-        updated_at:
           type: string
           format: date-time
       required:
@@ -382,8 +394,8 @@ components:
       - category_id
       - name
       - price
+      - is_active
       - created_at
-      - updated_at
     product_variant:
       type: object
       properties:
@@ -399,6 +411,8 @@ components:
           type: string
         stock_quantity:
           type: integer
+        sku:
+          type: string
       required:
       - id
       - product_id
@@ -416,31 +430,28 @@ components:
           format: uuid
         s3_key:
           type: string
-        url:
-          type: string
         position:
           type: integer
       required:
       - id
       - product_id
       - s3_key
-      - url
       - position
-    customer_order:
+    order:
       type: object
       properties:
         id:
           type: string
           format: uuid
-        order_reference:
+        reference:
           type: string
         email:
           type: string
         shipping_name:
           type: string
-        shipping_line1:
+        shipping_address_line1:
           type: string
-        shipping_line2:
+        shipping_address_line2:
           type: string
         shipping_city:
           type: string
@@ -460,17 +471,17 @@ components:
           type: string
         fulfilment_stage:
           type: string
-        stripe_payment_intent_id:
+        payment_reference:
           type: string
         created_at:
           type: string
           format: date-time
       required:
       - id
-      - order_reference
+      - reference
       - email
       - shipping_name
-      - shipping_line1
+      - shipping_address_line1
       - shipping_city
       - shipping_postcode
       - shipping_country
@@ -524,6 +535,8 @@ components:
           type: string
         password_hash:
           type: string
+        is_active:
+          type: boolean
         created_at:
           type: string
           format: date-time
@@ -531,6 +544,7 @@ components:
       - id
       - username
       - password_hash
+      - is_active
       - created_at
     admin_session:
       type: object
@@ -540,17 +554,20 @@ components:
         admin_user_id:
           type: string
           format: uuid
+        created_at:
+          type: string
+          format: date-time
         expires_at:
           type: string
           format: date-time
-        created_at:
+        revoked_at:
           type: string
           format: date-time
       required:
       - token
       - admin_user_id
-      - expires_at
       - created_at
+      - expires_at
     store_config:
       type: object
       properties:
@@ -570,6 +587,4 @@ components:
           type: boolean
       required:
       - id
-      - flat_shipping_amount
-      - free_shipping_threshold
       - pending_confirmation

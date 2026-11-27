@@ -5,135 +5,114 @@
 <!-- sdlc:auto:start narrative -->
 ## Summary
 
-### REQ-STACK · approved · source: requirements:stack
+### REQ-TECH-STACK · approved · source: requirements:technology stack
 
-Technology stack approved by the product owner for store-app.
+Technology stack approved by the product owner; design/build must use exactly these, no substitutions.
 
-Backend: FastAPI 0.115. Cloud: AWS. Database: PostgreSQL 16. Frontend: React 19. Requirements version 1, delivery scope marked 'lightweight'. Design must use exactly this stack, no substitutions.
-
-### REQ-SERVICES · approved · source: requirements:services
-
-External/integrated services the app relies on for payment, media storage and email.
-
-- Card payment provider used at checkout to take the grand total; no card details are stored by the store as a reusable account.
-- App's own media storage on AWS for product image uploads (no external PIM/ERP integration).
-- Email delivery for order confirmation emails; confirmation is sent by email only, with no SMS.
-
-**Related:** NFR-003
+Backend: FastAPI 0.115. Cloud: AWS. Database: PostgreSQL 16. Frontend: React 19. Requirements version 1.
 
 ### REQ-SCOPE · approved · source: requirements:scope
 
-Defines what store-app will and will not deliver in this release.
+Delivery scope is lightweight; a native mobile app is explicitly excluded in favour of a mobile-responsive web store.
 
-In scope: browse apparel catalogue by category; product pages with images, descriptions, prices; size/colour variants with per-variant stock; shopping cart; guest checkout capturing email and shipping address; order placement with a unique order reference; order lookup by reference and email showing current status; order total with flat-rate shipping and a single tax rate; admin sign-in to a protected area; catalogue management (products, variants, images, prices, stock); admin order list; product image uploads to the app's own AWS media storage; admin-configurable flat-rate shipping free over a threshold; a single configurable sales-tax/VAT rate; a single country and currency (to be confirmed).
-Out of scope: native mobile app (iOS/Android) -- delivered instead as a mobile-responsive web store.
+Delivery scope: lightweight. Out of scope -- do not design or build: Native mobile app (iOS/Android); delivered instead as a mobile-responsive web store.
 
-### REQ-BROWSE · approved · source: requirements:feature:Browsing the store
+### REQ-CAPABILITIES · approved · source: requirements:capabilities in scope
 
-Customers browse the catalogue by category and view product detail pages with variant stock.
+High-level list of the end-to-end capabilities the store must offer, spanning customer shopping/tracking and admin catalogue/order/config management.
 
-- Browse catalogue by category: select a category to see its products, each with thumbnail, name and price in the store currency; an empty category shows a 'no products currently available' message.
-- View product detail page: see images, description, price and selectable size/colour variants; selecting a size and colour shows whether that combination is in stock; out-of-stock combinations are shown unavailable and cannot be added to the cart.
+In scope: browse catalogue by category; product pages with images/descriptions/prices; size and colour variants with per-variant stock; shopping cart; guest checkout capturing email and shipping address; order placement with a unique order reference; order lookup by reference and email showing status; order total with flat-rate shipping and a single tax rate; admin sign-in to a protected area; catalogue management (products, variants, images, prices, stock); admin order list; product image uploads to the app's own AWS media storage; admin-configurable flat-rate shipping free over a threshold; a single configurable sales-tax/VAT rate; a single country and currency (to be confirmed).
 
-### REQ-CART · approved · source: requirements:feature:Cart & checkout
+### REQ-FEAT-BROWSING · approved · source: requirements:Browsing the store
 
-Customers add in-stock variants to a cart, adjust it, and complete guest checkout with card payment, shipping and tax applied.
+Customers browse the catalogue by category and open product detail pages showing variants and stock availability.
 
-- Add a variant to the cart: add an in-stock size/colour without logging in; cart shows updated item count and total; adding more than available stock is prevented and the max available quantity is shown.
-- Review and adjust the cart: see each item's product name, size, colour, unit price, quantity, line total, plus subtotal; change quantities or remove items updates the line and subtotal; empty cart shows a message and a way to keep browsing.
-- Enter email and shipping address: provide email and a shipping address within the single served country, no account required; missing/invalid email or incomplete address is flagged; an address outside the served country is refused with an explanation.
-- See order total with shipping and tax: checkout summary shows item subtotal, flat-rate shipping, tax amount and grand total in the store currency; shipping is free when subtotal reaches the configured threshold, otherwise charged at the flat rate.
-- Pay by card at checkout: pay the grand total by card via the payment provider; on success the order is placed; a declined/failed payment issues no order reference and lets the customer retry without losing the cart; an item that sells out before payment blocks the order until the cart is adjusted.
+- Browse catalogue by category: selecting a category lists its products with thumbnail, name and price in the store currency; an empty category shows a no-products-available message.
+- View product detail page: shows images, description, price and selectable size/colour variants; selecting a combination shows stock status; out-of-stock combinations are shown unavailable and cannot be added to cart.
 
-### REQ-ORDER-TRACK · approved · source: requirements:feature:Order confirmation & tracking
+### REQ-FEAT-CART-CHECKOUT · approved · source: requirements:Cart & checkout
 
-Placed orders get a unique reference, trigger a confirmation email, and can be tracked by reference and email to see the current fulfilment stage.
+Customers add in-stock variants to a cart, review/adjust it, then check out as a guest with email, shipping address, shipping/tax total and card payment.
 
-- Receive a unique order reference: on payment success the order is given a unique, never-reused reference shown on the confirmation screen.
-- Order confirmation email: on order placement, a confirmation email is sent to the checkout address with the order reference, items ordered and order total; email only, no SMS.
-- Look up an order: track without logging in by entering the order reference and checkout email, to see items and current fulfilment stage.
-- See current fulfilment stage: tracking page shows the current stage label (e.g. received, packed, shipped, delivered) set by admin, updated on next lookup after the admin changes it.
+- Add a variant to the cart: in-stock size/colour added without login; cart shows updated item count and total; cannot exceed available stock, max quantity shown.
+- Review and adjust the cart: shows product name, size, colour, unit price, quantity, line total, and subtotal per item; quantity changes/removals update lines and subtotal; empty cart shows a message plus a way to keep browsing.
+- Enter email and shipping address: no account required; address must be within the single served country; missing/invalid email or incomplete address is flagged; out-of-country address is refused with explanation.
+- See order total with shipping and tax: checkout summary shows subtotal, flat-rate shipping charge, tax amount and grand total in store currency; shipping shown free when subtotal reaches configured threshold, else flat rate applies.
+- Pay by card at checkout: payment taken via payment provider for the grand total; success places the order; a declined/failed payment issues no order reference and lets the customer retry without losing the cart; an item selling out before payment blocks the order until the cart is adjusted.
 
-### REQ-ADMIN-SIGNIN · approved · source: requirements:feature:Admin sign-in
+### REQ-FEAT-ORDER-CONFIRMATION-TRACKING · approved · source: requirements:Order confirmation & tracking
 
-Admin team members sign in with username and password to reach a protected admin area.
+Successful orders get a unique reference and a confirmation email, and customers can later look up status by reference plus email.
 
-Valid credentials grant access to the admin area; incorrect credentials are refused with a generic error that does not reveal which field was wrong.
+- Receive a unique order reference: generated on payment success, shown on confirmation screen; every order gets a distinct, non-reused reference.
+- Order confirmation email: sent to the checkout email, containing order reference, items ordered and order total; email only, no SMS.
+- Look up an order: customer enters order reference and checkout email (no login) to see items and current fulfilment stage.
+- See current fulfilment stage: tracking page shows the current stage label (received/packed/shipped/delivered) set by admin, and reflects updates on next lookup.
 
-**Related:** NFR-001, NFR-002
+### REQ-FEAT-ADMIN-SIGNIN · approved · source: requirements:Admin sign-in
 
-### REQ-CATALOG-MGMT · approved · source: requirements:feature:Catalogue management
+Admin team members authenticate with username and password to reach the protected admin area.
 
-Admins create and edit products, manage size/colour variants and stock, and upload/remove product images.
+Admin sign-in: valid credentials grant access to the protected admin area; incorrect credentials are refused with a generic error that does not reveal which field was wrong.
 
-- Create and edit products: add/edit name, category, description and price; changes appear in the catalogue and product page; a missing name or invalid price is flagged and not saved.
-- Manage variants and stock: define size/colour variants and set stock quantity per variant; available stock is reduced when an order is placed; a variant with zero stock is shown to customers as unavailable.
-- Upload product images: upload one or more images per product into the app's own AWS media storage, shown on the product page; removing an image deletes it so it is no longer shown.
+### REQ-FEAT-CATALOGUE-MGMT · approved · source: requirements:Catalogue management
 
-### REQ-ORDER-MGMT · approved · source: requirements:feature:Order management
+Signed-in admins create/edit products, manage variants and stock, and upload/remove product images in the app's own AWS media storage.
 
-Admins view the order list and manually advance each order's fulfilment stage.
+- Create and edit products: name, category, description, price; changes appear in catalogue and on the product page; missing name or invalid price is flagged and not saved.
+- Manage variants and stock: define size/colour variants with per-variant stock; stock reduces on order placement; a variant at zero stock shows as unavailable to customers.
+- Upload product images: one or more images per product stored in the app's own AWS media storage and shown on the product page; removing an image deletes it and stops it being shown.
 
-- View the order list: see reference, customer email, order total, date and current fulfilment stage; open an order to see its items, variants, quantities, totals and shipping address.
-- Advance fulfilment stages: manually move an order to a later stage (received, packed, shipped, delivered); change is recorded within the app and reflected in customer tracking; no courier/carrier integration.
+### REQ-FEAT-ORDER-MGMT · approved · source: requirements:Order management
 
-### REQ-SETTINGS · approved · source: requirements:feature:Store settings
+Admins view the list of placed orders and manually advance each order through fulfilment stages.
 
-Store operates in a single country/currency with admin-configurable flat-rate shipping and a single sales-tax/VAT rate.
+- View the order list: shows reference, customer email, order total, date and current fulfilment stage; opening an order shows its items, variants, quantities, totals and shipping address.
+- Advance fulfilment stages: admin manually moves an order to a later stage (received/packed/shipped/delivered); change is recorded in-app and reflected in customer tracking; no courier/carrier integration.
 
-- Configure country and currency: all monetary values shown in the one store currency; shipping offered only within the one served country; country, currency and tax rate are recorded as 'to be confirmed' until named.
-- Configure shipping: admins set a flat-rate shipping charge and a free-shipping threshold applied to all checkouts; flat rate charged below threshold, free at/above it.
-- Configure sales-tax rate: admins set a single sales-tax/VAT rate used on all orders; until named it is used as a configurable rate clearly marked pending confirmation.
+### REQ-FEAT-STORE-SETTINGS · approved · source: requirements:Store settings
 
-**Related:** NFR-005
+Admins configure the store's single country/currency, flat-rate shipping with free threshold, and a single sales-tax/VAT rate.
+
+- Configure country and currency: store operates in one confirmed country/currency; all monetary values shown in that currency; shipping offered only within that country; until named, country/currency/tax rate are recorded as to-be-confirmed.
+- Configure shipping: admin sets a flat-rate shipping charge and free-shipping threshold applied to all checkouts.
+- Configure sales-tax rate: admin sets a single sales-tax/VAT rate used on all orders; until named it is a configurable rate clearly marked pending confirmation.
 
 ### NFR-001 · approved · source: requirements:NFR-001
 
-Security: admin area stays protected and sessions end on sign-out or inactivity expiry.
+[security] Admin area is reachable only while signed in; sessions end on sign-out or inactivity expiry.
 
-[security] Admin pages/actions are reachable only while signed in; anyone not signed in is redirected to sign-in. A session ends on sign-out or inactivity expiry, after which the admin must sign in again.
-
-**Related:** REQ-ADMIN-SIGNIN
+Anyone not signed in is redirected to the sign-in screen for any admin page or action. An admin's session ends on sign-out or when it reaches its inactivity expiry, after which they must sign in again.
 
 ### NFR-002 · approved · source: requirements:NFR-002
 
-Security: admin passwords are hashed and sign-in failures give a generic error.
+[security] Admin passwords are stored only hashed; failed sign-in shows a generic error.
 
-[security] Admin passwords are stored only in hashed form and never shown back in plain text. A failed sign-in shows a generic error that does not reveal whether the username or password was wrong.
-
-**Related:** REQ-ADMIN-SIGNIN
+Passwords are never shown back in plain text. A failed sign-in shows a generic error that does not reveal whether the username or the password was wrong.
 
 ### NFR-003 · approved · source: requirements:NFR-003
 
-Security: card details are never stored by the store itself.
+[security] Card details are never stored by the store; payment is taken via the external payment provider.
 
-[security] Card payments are taken through the external payment provider at checkout; no card details are stored by the store as a reusable account.
-
-**Related:** REQ-CART, REQ-SERVICES
+Card payments are processed through the external payment provider at checkout; no card details are stored by the store as a reusable account.
 
 ### NFR-004 · approved · source: requirements:NFR-004
 
-Privacy: order lookup only succeeds when reference and email both match.
+[privacy] Order details are shown only when both the order reference and checkout email match.
 
-[privacy] Order details are shown only when the order reference and the checkout email both match; otherwise (mismatch or non-existent reference) no details are shown and the message does not reveal which value was at fault.
-
-**Related:** REQ-ORDER-TRACK
+If reference and email do not match, or the reference does not exist, no order details are shown, and the message does not reveal whether the reference or the email was at fault.
 
 ### NFR-005 · approved · source: requirements:NFR-005
 
-Compliance: customer data handling follows the served country's consumer/data-protection rules, pending confirmation of that country.
+[compliance] Customer data handling follows the consumer/data-protection rules of the single served country.
 
-[compliance] Handling of customer data follows the consumer and data-protection rules of the single country served; that country, its currency and tax rate are still to be confirmed and are recorded as pending confirmation (open assumption).
-
-**Related:** REQ-SETTINGS
+The specific country, its currency and tax rate are still to be confirmed and are recorded as pending confirmation; privacy handling is to follow that country's rules once named.
 
 ### NFR-006 · approved · source: requirements:NFR-006
 
-Compatibility: the store is mobile-responsive on phone browsers.
+[compatibility] The store is a mobile-responsive web store usable on small phone screens.
 
-[compatibility] The store is delivered as a mobile-responsive web store; layout adapts so category listings, product pages and the cart stay usable on a small phone screen.
-
-**Related:** REQ-BROWSE, REQ-CART
+Layout adapts so category listings, product pages and the cart stay usable on a small phone screen; no native mobile app is built.
 <!-- sdlc:auto:end narrative -->
 
 <!-- sdlc:auto:start summary -->
